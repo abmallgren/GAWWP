@@ -18,6 +18,7 @@ if (sendForApprovalButton) {
         fetch('/wp-admin/admin-ajax.php?action=submit_email_for_approval', {
             method: 'POST',
             headers: {
+                'X-WP-Nonce': GmailEmailApproval.submit_email_for_approval_nonce,
                 'Content-Type': 'application/json'
             },
             body: JSON.stringify({
@@ -55,7 +56,11 @@ function loadEmails(pageToken = null) {
     const url = "/wp-admin/admin-ajax.php?action=get_gmail_messages" +
                 (pageToken ? "&pageToken=" + pageToken : "");
 
-    fetch(url)
+    fetch(url, {
+      headers: {
+          'X-WP-Nonce': GmailEmailApproval.get_gmail_messages_nonce,
+          'Content-Type': 'application/json'
+      }})
         .then(r => r.json())
         .then(data => {
             if (!data.success) return;

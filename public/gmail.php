@@ -1,5 +1,9 @@
 <?php
 
+namespace GmailEmailApproval;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 function gmail_header($headers, $name) {
     foreach ($headers as $header) {
         if (isset($header['name']) && strtolower($header['name']) === strtolower($name)) {

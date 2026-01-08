@@ -1,5 +1,9 @@
 <?php
 
+namespace GmailEmailApproval;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 add_filter('use_curl_transport', '__return_false');
 
 add_action('admin_menu', function () {
@@ -34,11 +38,16 @@ add_action('wp_enqueue_scripts', function ($hook) {
 
 function email_approval_settings_page() {
 
-    if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['approver_email'])) {
+    if (isset($_SERVER['REQUEST_METHOD']) 
+            && $_SERVER['REQUEST_METHOD'] === 'POST' 
+            && isset($_POST['approver_email'])
+            && isset($_POST['google_client_id'])
+            && isset($_POST['google_client_secret'])
+            && isset($_POST['approver_email'])) {
         check_admin_referer('email_approval_settings_save');
-        update_option('google_client_id', sanitize_text_field($_POST['google_client_id']));
-        update_option('google_client_secret', sanitize_text_field($_POST['google_client_secret']));
-        update_option('approver_email', sanitize_email($_POST['approver_email']));
+        update_option('google_client_id', sanitize_text_field(wp_unslash($_POST['google_client_id'])));
+        update_option('google_client_secret', sanitize_text_field(wp_unslash($_POST['google_client_secret'])));
+        update_option('approver_email', sanitize_email(wp_unslash($_POST['approver_email'])));
         echo '<div class="updated"><p>Settings saved.</p></div>';
     }
 

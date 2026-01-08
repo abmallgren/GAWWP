@@ -1,5 +1,9 @@
 <?php
 
+namespace GmailEmailApproval;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 require_once plugin_dir_path(__FILE__) . 'gmail.php';
 require_once plugin_dir_path(__FILE__) . '../includes/auth.php';
 require_once plugin_dir_path(__FILE__) . '../includes/email.php';
@@ -16,6 +20,12 @@ add_action('wp_ajax_send_email', 'ajax_send_email');
 add_action('wp_ajax_nopriv_send_email', 'ajax_send_email');
 
 function ajax_send_email() {
+    if (
+        ! isset( $_POST['send_email_nonce'] ) ||
+        ! wp_verify_nonce( sanitize_text_field(wp_unslash( $_POST['send_email_nonce']) ), 'send_email' )
+    ) {
+        wp_die( 'Security check failed' );
+    }
     $id = verify_google_id_token();
     if ($id != false) {
         global $wpdb;
@@ -33,17 +43,11 @@ function ajax_send_email() {
 
         send_email($row->to, 
             $row->subject, 
-            <<<STRING
-                <html>
-                    <body>
-                        $row->content
-                        <br/>
-                        $row->signature
-                        <br/>
-                        $row->history
-                    </body>
-                </html>
-            STRING, 
+            "<html>" .
+                    "<body>" . 
+                        "{$row->content}<br/>{$row->signature}<br/>{$row->history}" .
+                    "</body>" .
+                "</html>", 
         $cc = get_option('approver_email'));
 
         $table = $wpdb->prefix . 'email_approvals';
@@ -59,6 +63,12 @@ function ajax_send_email() {
 }
 
 function ajax_submit_email_feedback() {
+    if (
+        ! isset( $_POST['submit_email_feedback_nonce'] ) ||
+        ! wp_verify_nonce( sanitize_text_field(wp_unslash( $_POST['submit_email_feedback_nonce']) ), 'submit_email_feedback' )
+    ) {
+        wp_die( 'Security check failed' );
+    }
     $id = verify_google_id_token();
     if ($id != false) {
         global $wpdb;
@@ -88,25 +98,26 @@ function ajax_submit_email_feedback() {
 
         send_email($row->from, 
             "Feedback: " . $row->subject, 
-            <<<STRING
-                <html>
-                    <body>
-                        <div>Feedback has been submitted for the following email:</div>
-                        <br/>
-                        <div>Subject: $row->subject</div>
-                        <br/>
-                        <div>Feedback: $row->feedback</div>
-                        <br/>
-                        <div>Please visit: $url to revise this email.</div>
-                    </body>
-                </html>
-            STRING);
+            "<html>" . 
+                    "<body>" . 
+                        "<div>Feedback has been submitted for the following email:</div><br/>" .
+                        "<div>Subject: {$row->subject}</div><br/>" . 
+                        "<div>Feedback: {$row->feedback}</div><br/>" . 
+                        "<div>Please visit: {$url} to revise this email.</div>" . 
+                    "</body>" . 
+                "</html>");
 
         wp_send_json_success("Feedback submitted");
     }
 }
 
 function ajax_approve_email() {
+    if (
+        ! isset( $_POST['approve_email_nonce'] ) ||
+        ! wp_verify_nonce( sanitize_text_field(wp_unslash( $_POST['approve_email_nonce']) ), 'approve_email' )
+    ) {
+        wp_die( 'Security check failed' );
+    }
     $id = verify_google_id_token();
     if ($id != false && $id['email'] === get_option('approver_email')) {
         global $wpdb;
@@ -134,22 +145,24 @@ function ajax_approve_email() {
 
         send_email($row->from, 
             "Approved: " . $row->subject, 
-            <<<STRING
-                <html>
-                    <body>
-                        <div>An email was approved.</div>
-                        <br/>
-                        <div>Subject: $row->subject</div>
-                        <br/>
-                        <div>Please visit: $url to send the email.</div>
-                    </body>
-                </html>
-            STRING);
+            "<html>" . 
+                    "<body>" .
+                        "<div>An email was approved.</div><br/>" . 
+                        "<div>Subject: {$row->subject}</div><br/>" .
+                        "<div>Please visit: {$url} to send the email.</div>" . 
+                    "</body>" .
+                "</html>");
 
         wp_send_json_success("Email approved");
     }
 }
 function ajax_submit_email_for_approval() {
+    if (
+        ! isset( $_POST['submit_email_for_approval_nonce'] ) ||
+        ! wp_verify_nonce( sanitize_text_field(wp_unslash( $_POST['submit_email_for_approval_nonce']) ), 'submit_email_for_approval' )
+    ) {
+        wp_die( 'Security check failed' );
+    }
     $id = verify_google_id_token();
     if ($id != false) {
         global $wpdb;
@@ -178,32 +191,37 @@ function ajax_submit_email_for_approval() {
 
         send_email(get_option('approver_email'), 
             "Approval needed: " . $subject, 
-            <<<STRING
-                <html>
-                    <body>
-                        <div>An email needs your approval.</div>
-                        <br/>
-                        <div>Subject: $subject</div>
-                        <br/>
-                        <div>Please visit: $url to approve or provide feedback for the email.</div>
-                    </body>
-                </html>
-            STRING);
+            "<html>" .
+                    "<body>" . 
+                        "<div>An email needs your approval.</div><br/>" . 
+                        "<div>Subject: {$subject}</div><br/>" .
+                        "<div>Please visit: {$url} to approve or provide feedback for the email.</div>" . 
+                    "</body>" . 
+                "</html>");
 
         wp_send_json_success("Email submitted for approval");
     }
 }
 function ajax_get_gmail_messages() {
-    $token = $_COOKIE['google_access_token'] ?? null;
-    $pageToken = $_GET['pageToken'] ?? null;
-
-    if (!$token) {
-        wp_send_json_error("Not authenticated");
+    if (
+        ! isset( $_POST['get_gmail_messages_nonce'] ) ||
+        ! wp_verify_nonce( sanitize_text_field(wp_unslash( $_POST['get_gmail_messages_nonce']) ), 'get_gmail_messages' )
+    ) {
+        wp_die( 'Security check failed' );
     }
 
-    $result = gmail_get_messages($token, $pageToken);
+    if (isset($_COOKIE['google_access_token']) && isset($_GET['pageToken'])) {
+        $token = sanitize_text_field(wp_unslash($_COOKIE['google_access_token'])) ?? null;
+        $pageToken = intval(wp_unslash($_GET['pageToken'])) ?? null;
 
-    wp_send_json_success($result);
+        if (!$token) {
+            wp_send_json_error("Not authenticated");
+        }
+
+        $result = gmail_get_messages($token, $pageToken);
+
+        wp_send_json_success($result);
+    }
 }
 
 add_action('wp_enqueue_scripts', function () {
@@ -228,7 +246,7 @@ function handle_google_callback() {
         return;
     }
 
-    $code = sanitize_text_field($_GET['code']);
+    $code = sanitize_text_field(wp_unslash($_GET['code']));
 
     $token_url = "https://oauth2.googleapis.com/token";
 
@@ -260,12 +278,6 @@ function handle_google_callback() {
 
     // Now notify the opener window
     callback_success_page($access_token);
-}
-
-function callback_success_page($access_token) {
-    ?>
-    
-    <?php
 }
 
 add_action('init', function () {
@@ -303,6 +315,17 @@ add_shortcode('google_login_button', function () {
         ]),
     ], 'https://accounts.google.com/o/oauth2/v2/auth');
 
+    wp_enqueue_script('gmail-script');
+
+    wp_localize_script( 'gmail-script', 'GmailEmailApproval', [
+        'get_gmail_messages_nonce' => wp_create_nonce( 'get_gmail_messages' ),
+        'submit_email_for_approval_nonce' => wp_create_nonce( 'submit_email_for_approval' ),
+        'approve_email_nonce' => wp_create_nonce( 'approve_email' ),
+        'submit_email_feedback_nonce' => wp_create_nonce( 'submit_email_feedback' ),
+        'send_email_nonce' => wp_create_nonce( 'send_email' ),
+        'ajax_url' => admin_url( 'admin-ajax.php' ),
+    ] );
+
     if (!isset($_COOKIE['google_access_token'])) {
         if (isset($_GET['email_id'])) {
             setcookie("email_approval_email_id", $_GET['email_id'], time()+3600, "/");
@@ -318,7 +341,7 @@ add_shortcode('google_login_button', function () {
         ?>
 
         <a href="<?php echo esc_url($auth_url); ?>" class="google-btn">
-            <img src="https://developers.google.com/identity/images/g-logo.png" alt="Google logo">
+            <img src="<?php echo esc_html(plugin_dir_url(dirname(__FILE__, 1)) . 'assets/g-logo.png'); ?>" alt="Google logo">
             <span>Sign in with Google</span>
         </a>
 
@@ -344,7 +367,7 @@ add_shortcode('google_login_button', function () {
         ?>
 
         <div>
-            <input type="hidden" id="emailApprovalId" value="<?php echo $emailId; ?>" />
+            <input type="hidden" id="emailApprovalId" value="<?php echo intval($emailId); ?>" />
             <div>
                 <button type="button" id="topAppoveButton">Approve</button>
                 <button type="button" id="topRejectButton">Reject</button>
@@ -357,9 +380,9 @@ add_shortcode('google_login_button', function () {
             <div>
                 <div style="margin-top: 10px;">To: <span id="toEmailSpan"><?php echo esc_html($row->to); ?></span></div>
                 <div>Subject: <span id="subjectSpan"><?php echo esc_html($row->subject); ?></span></div>
-                <div style="margin: 10px 0px" id="contentDiv"><?php echo $row->content; ?></div>
-                <div style="margin: 10px 0px" id="signatureDiv"><?php echo $row->signature; ?></div>
-                <div id="historyDiv"><?php echo $row->history; ?></div>
+                <div style="margin: 10px 0px" id="contentDiv"><?php echo wp_kses_post($row->content); ?></div>
+                <div style="margin: 10px 0px" id="signatureDiv"><?php echo wp_kses_post($row->signature); ?></div>
+                <div id="historyDiv"><?php echo wp_kses_post($row->history); ?></div>
             </div>
         </div>
 
@@ -386,18 +409,18 @@ add_shortcode('google_login_button', function () {
         ?>
 
         <div>
-            <div>To: <input type="email" id="toEmail" value="<?php echo $row->to; ?>" /></div>
-            <div>Subject: <input type="text" id="emailSubjectTextbox" value="<?php echo $row->subject; ?>" /></div>
-            <div><textarea id="emailContentTextarea"><?php echo htmlToPlainText($row->content); ?></textarea></div>
+            <div>To: <input type="email" id="toEmail" value="<?php echo esc_html($row->to); ?>" /></div>
+            <div>Subject: <input type="text" id="emailSubjectTextbox" value="<?php echo esc_html($row->subject); ?>" /></div>
+            <div><textarea id="emailContentTextarea"><?php echo wp_kses_post($row->content); ?></textarea></div>
             <div id="signatureDiv"></div>
             <button type="button" id="sendForApprovalButton">Send for Approval</button>
             <div id="emailHistoryDiv">
-                <?php echo $row->history; ?>
+                <?php echo wp_kses_post($row->history); ?>
             </div>
         </div>
 
         <?php
-        wp_enqueue_script('gmail-script');
+
         return ob_get_clean();
     }
 
@@ -419,19 +442,19 @@ add_shortcode('google_login_button', function () {
         ?>
 
         <div>
-            <input type="hidden" id="sendEmailId" value="<?php echo $sendEmailId; ?>" />
+            <input type="hidden" id="sendEmailId" value="<?php echo intval($sendEmailId); ?>" />
             <div>To: <span id="toEmailSpan"><?php echo esc_html($row->to); ?></span></div>
             <div>Subject: <span id="subjectSpan"><?php echo esc_html($row->subject); ?></span></div>
-            <div style="margin: 10px 0px" id="contentDiv"><?php echo $row->content; ?></div>
-            <div id="signatureDiv"><?php echo $row->signature; ?></div>
+            <div style="margin: 10px 0px" id="contentDiv"><?php echo wp_kses_post($row->content); ?></div>
+            <div id="signatureDiv"><?php echo wp_kses_post($row->signature); ?></div>
             <button type="button" id="sendEmailButton">Send Email</button>
             <div id="emailHistoryDiv">
-                <?php echo $row->history; ?>
+                <?php echo wp_kses_post($row->history); ?>
             </div>
         </div>
 
         <?php
-        wp_enqueue_script('gmail-script');
+
         return ob_get_clean();
     }
     else {
@@ -459,24 +482,9 @@ add_shortcode('google_login_button', function () {
             </div>
         </div>
         <?php
-        wp_enqueue_script('gmail-script');
+        
         return ob_get_clean();
     }
-});
-
-add_shortcode('email_approval_page', function () {
-    ob_start();
-    ?>
-    <h2>Email Approval Page</h2>
-    <form>
-        <table>
-            <tr>
-                <td></td>
-            </tr>
-        </table>
-    </form>
-    <?php
-    return ob_get_clean();
 });
 
 ?>

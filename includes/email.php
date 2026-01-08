@@ -1,24 +1,24 @@
 <?php
 
+namespace GmailEmailApproval;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
+
 require_once plugin_dir_path(__FILE__) . 'auth.php';
 
 function send_email($to, $subject, $body, $cc = '') {
     $id = verify_google_id_token();
-    if ($id != false) {
-        $accessToken = $_COOKIE['google_access_token'];
+    if ($id != false && isset($_COOKIE['google_access_token'])) {
+        $accessToken = sanitize_text_field(wp_unslash($_COOKIE['google_access_token']));
 
         $url = "https://gmail.googleapis.com/gmail/v1/users/me/messages/send";
 
-        $email = <<<STRING
-        To: $to
-        Cc: $cc
-        Subject: $subject
-        Content-Type: text/html; charset="UTF-8"
-        MIME-Version: 1.0
-
-        $body
-
-        STRING;
+        $email = "To: {$to}\n" . 
+            "Cc: {$cc}\n" .
+            "Subject: {$subject}\n" .
+            "Content-Type: text/html; charset=\"UTF-8\"\n" . 
+            "MIME-Version: 1.0\n\n" . 
+            "{$body}\n";
 
         $raw = base64_encode($email);
         $raw = str_replace(['+', '/', '='], ['-', '_', ''], $raw); // URL-safe base64

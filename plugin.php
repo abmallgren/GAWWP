@@ -4,7 +4,12 @@
  * Description: Provides email approval workflow functionality for Gmail.
  * Version: 1.0
  * Author: Anthony Brian Mallgren
+ * License: GPLv2
  */
+
+namespace GmailEmailApproval;
+
+if ( ! defined( 'ABSPATH' ) ) exit;
 
 require_once plugin_dir_path(__FILE__) . 'includes/core.php';
 require_once plugin_dir_path(__FILE__) . 'public/client.php';
@@ -47,6 +52,6 @@ register_activation_hook(__FILE__, function () {
     }
 });
 
-register_activation_hook(__FILE__, 'my_plugin_install');
+register_activation_hook(__FILE__, 'install');
 
 ?>
